@@ -4,10 +4,11 @@ import asyncWrapper from "../utils/async-handler";
 import { remoteOkScrapper } from "../scrappers/remote-ok";
 import successResponse from "../utils/success-response";
 import { himalayasScrapper } from "../scrappers/himalayas";
-import { scrapAllJobs } from "../services/jobs-service";
+import { getAllJobs, scrapAllJobs } from "../services/jobs-service";
 import { scrappers } from "../scrappers";
 import { wwrScrapper } from "../scrappers/wwr";
 import { arbeitnowScrapper } from "../scrappers/arbeitnow";
+import { Query } from "../utils/job.interface";
 
 const getRemoteOkJobs = asyncWrapper(async (req: Request, res: Response) => {
   const data = await remoteOkScrapper.scrap();
@@ -54,10 +55,20 @@ const scrapeAll = asyncWrapper(async (req: Request, res: Response) => {
   successResponse({ res, responseData });
 });
 
+const allJobs = asyncWrapper(async (req: Request, res: Response) => {
+  const jobs = await getAllJobs(req.query);
+
+  if (!jobs) throw new Error("Something went wrong");
+
+  const responseData = { data: jobs };
+  successResponse({ res, responseData });
+});
+
 export {
   getRemoteOkJobs,
   getHimalayasJobs,
   getWWRJobs,
   getArbeitnowJobs,
   scrapeAll,
+  allJobs,
 };

@@ -1,5 +1,6 @@
 import express from "express";
 import {
+  allJobs,
   getArbeitnowJobs,
   getHimalayasJobs,
   getRemoteOkJobs,
@@ -9,10 +10,12 @@ import {
 
 const jobsRoutes = express.Router();
 
-jobsRoutes.get("/remote-ok", getRemoteOkJobs);
-jobsRoutes.get("/himalayas", getHimalayasJobs);
-jobsRoutes.get("/wwr", getWWRJobs);
-jobsRoutes.get("/arbeitnow", getArbeitnowJobs);
-jobsRoutes.get("/all", scrapeAll);
+jobsRoutes
+  .get("/all", allJobs)
+  .get("/remote-ok", getRemoteOkJobs)
+  .get("/himalayas", getHimalayasJobs)
+  .get("/wwr", getWWRJobs)
+  .get("/arbeitnow", getArbeitnowJobs)
+  .post("/scrape/all", scrapeAll);
 
 export default jobsRoutes;
