@@ -1,47 +1,84 @@
 import { JobScrapper } from "../utils/types";
 import { IJob } from "../utils/job.interface";
 import { isAngularJob } from "../utils/angular-filter";
+import { saveJobs } from "../services/jobs-service";
 
 const HIMALAYAS_URL = "https://himalayas.app/jobs/api/search?q=angular";
 
 const scrapeHimalayas = async () => {
-  const response = await fetch(HIMALAYAS_URL);
+  let hasNexPage: boolean = true;
+  let page = 1;
+  const jobs: IJob[] = [];
+  let cursor: string | null = null;
 
-  const data = await response.json();
+  while (true) {
+    const url: string = cursor
+      ? `${HIMALAYAS_URL}&cursor=${encodeURIComponent(cursor)}`
+      : HIMALAYAS_URL;
+    const url2 = `${HIMALAYAS_URL}&page=${page}`;
+    const response = await fetch(url2);
 
-  const jobs: IJob[] = data.jobs.map((item: any): any => ({
-    title: item.title,
-    company: item.companyName,
-    description: item.description ?? "",
+    const pageResponse = await response.json();
 
-    location: item.locationRestrictions
-      ? item.locationRestrictions.join(", ")
-      : null,
+    const lastJob = pageResponse.jobs[pageResponse.jobs.length - 1];
+    const isTooOld = lastJob ? isOlderThanTwoMonths(lastJob) : true;
 
-    remote: true,
+    if (!pageResponse.jobs || pageResponse.jobs.length === 0 || page >= 20) {
+      break;
+    }
 
-    employmentType: item.employmentType || [],
+    jobs.push(
+      ...pageResponse.jobs.map((item: any): any => ({
+        title: item.title,
+        company: item.companyName,
+        description: item.description ?? "",
+        location: item.locationRestrictions
+          ? item.locationRestrictions.join(", ")
+          : null,
+        remote: true,
+        employmentType: item.employmentType || [],
+        skills: item.categories ?? [],
+        salary: {
+          min: item.minSalary || undefined,
+          max: item.maxSalary || undefined,
+          currency: item.currency || undefined,
+        },
+        source: "Himalayas",
+        sourceJobId: String(item.guid),
+        url: item.applicationLink,
+        postedAt: item.pubDate ? new Date(item.pubDate * 1000) : null,
+        scrapedAt: new Date(),
+      })),
+    );
 
-    skills: item.categories ?? [],
+    // cursor = pageResponse.nextCursor ?? null;
+    //
+    // if (!cursor) {
+    //   break;
+    // }
 
-    salary: {
-      min: item.minSalary || undefined,
-      max: item.maxSalary || undefined,
-      currency: item.currency || undefined,
-    },
+    await saveJobs(jobs);
 
-    source: "Himalayas",
+    console.log({
+      page: {
+        index: page,
+        jobs: pageResponse.jobs.length,
+        totalCount: pageResponse.totalCount,
+        nextCursor: pageResponse.nextCursor,
+      },
+    });
 
-    sourceJobId: String(item.guid),
+    page++;
+  }
 
-    url: item.applicationLink,
+  return [];
+};
 
-    postedAt: item.pubDate ? new Date(item.pubDate * 1000) : null,
-
-    scrapedAt: new Date(),
-  }));
-
-  return jobs;
+const isOlderThanTwoMonths = (timeStamp: number): boolean => {
+  const date = new Date(timeStamp * 1000);
+  const now = new Date();
+  const twoMonthsAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+  return date < twoMonthsAgo;
 };
 
 export const himalayasScrapper: JobScrapper = {

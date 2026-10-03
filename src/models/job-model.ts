@@ -23,6 +23,8 @@ const JobSchema = new mongoose.Schema({
 
   postedAt: { type: Date },
   scrapedAt: { type: Date, required: true },
+  lastSeenAt: { type: Date, required: true },
+  active: { type: Boolean, default: true },
 });
 
 const Jobs = mongoose.model("Jobs", JobSchema);

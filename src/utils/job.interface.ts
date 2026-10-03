@@ -16,6 +16,8 @@ export interface IJob {
   url: string;
   postedAt?: Date;
   scrapedAt: Date;
+  lastSeenAt?: Date;
+  active?: boolean;
 }
 
 export interface Query {

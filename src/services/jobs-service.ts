@@ -18,11 +18,7 @@ const scrapAllJobs = async (scapers: JobScrapper[]): Promise<any> => {
     }
   });
 
-  const uniqueJobs = deDuplicator(jobs);
-
-  await saveJobs(uniqueJobs);
-
-  return uniqueJobs;
+  return deDuplicator(jobs);
 };
 
 const saveJobs = async (jobs: IJob[]) => {
@@ -33,7 +29,10 @@ const saveJobs = async (jobs: IJob[]) => {
         url: job.url,
       },
       update: {
-        $set: job,
+        $set: {
+          ...job,
+          lastSeenAt: new Date(),
+        },
       },
       upsert: true,
     },
@@ -47,7 +46,12 @@ const saveJobs = async (jobs: IJob[]) => {
     };
   }
 
-  return Jobs.bulkWrite(operations);
+  const result = await Jobs.bulkWrite(operations);
+
+  return {
+    inserted: result.insertedCount,
+    upserted: result.upsertedCount,
+  };
 };
 
 const getAllJobs = async (query: Partial<Query>) => {
@@ -86,4 +90,19 @@ const getAllJobs = async (query: Partial<Query>) => {
   };
 };
 
-export { scrapAllJobs, getAllJobs };
+const updateJobs = async () => {
+  await Jobs.updateMany(
+    {
+      lastSeenAt: {
+        $lt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+      },
+    },
+    {
+      $set: {
+        active: false,
+      },
+    },
+  );
+};
+
+export { scrapAllJobs, getAllJobs, saveJobs, updateJobs };

@@ -4,7 +4,7 @@ import asyncWrapper from "../utils/async-handler";
 import { remoteOkScrapper } from "../scrappers/remote-ok";
 import successResponse from "../utils/success-response";
 import { himalayasScrapper } from "../scrappers/himalayas";
-import { getAllJobs, scrapAllJobs } from "../services/jobs-service";
+import { getAllJobs, saveJobs, scrapAllJobs } from "../services/jobs-service";
 import { scrappers } from "../scrappers";
 import { wwrScrapper } from "../scrappers/wwr";
 import { arbeitnowScrapper } from "../scrappers/arbeitnow";
