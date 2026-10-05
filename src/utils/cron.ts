@@ -6,8 +6,7 @@ import { scrappers } from "../scrappers";
 const startJobScraper = () => {
   cron.schedule("0 */6 * * *", async () => {
     try {
-      const jobs = await scrapAllJobs(scrappers);
-      await saveJobs(jobs);
+      await scrapAllJobs(scrappers);
     } catch (error) {
       console.error("Scheduled job scrape failed:", error);
     }

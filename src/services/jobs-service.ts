@@ -1,57 +1,83 @@
 import { JobScrapper } from "../utils/types";
 import { IJob, Query } from "../utils/job.interface";
-import { deDuplicator } from "../utils/deduplicator";
 import Jobs from "../models/job-model";
+import { canonicalUrl, makeFingerprint } from "../utils/dedub";
+import { AnyBulkWriteOperation } from "mongoose";
 
-const scrapAllJobs = async (scapers: JobScrapper[]): Promise<any> => {
-  const result = await Promise.allSettled(scapers.map((s) => s.scrap()));
+const scrapAllJobs = async (scrapers: JobScrapper[]): Promise<any> => {
+  const result = await Promise.allSettled(scrapers.map((s) => s.scrape()));
 
-  const jobs: IJob[] = [];
+  let jobs: number = 0;
 
   result.forEach((r, index) => {
-    const scraper = scapers[index];
+    const scraper = scrapers[index];
 
     if (r.status === "fulfilled") {
-      jobs.push(...r.value);
+      jobs += r.value;
     } else {
       console.error(`Error occurred while scraping ${scraper.name}:`, r.reason);
     }
   });
 
-  return deDuplicator(jobs);
+  // return deDuplicator(jobs);
+  return jobs;
 };
 
-const saveJobs = async (jobs: IJob[]) => {
-  const operations = jobs.map((job) => ({
-    updateOne: {
-      filter: {
-        source: job.source,
-        url: job.url,
-      },
-      update: {
-        $set: {
-          ...job,
-          lastSeenAt: new Date(),
-        },
-      },
-      upsert: true,
-    },
-  }));
+let totalJobs = 0;
 
-  if (operations.length === 0) {
+const saveJobs = async (jobs: IJob[]) => {
+  if (!jobs.length) return;
+
+  totalJobs += jobs.length;
+
+  const ops: AnyBulkWriteOperation<any>[] = jobs.map((job) => {
+    const fingerprint = makeFingerprint(job);
+    const cUrl = canonicalUrl(job.url);
+    const useUrl = isSpecificUrl(cUrl);
+
+    const filter = useUrl
+      ? { $or: [{ fingerprint }, { "sources.canonicalUrl": cUrl }] }
+      : { fingerprint };
+
     return {
-      matched: 0,
-      modified: 0,
-      upserted: 0,
+      updateOne: {
+        filter,
+        update: {
+          // keep the full job, including source/url/scrapedAt, for the first writer
+          $setOnInsert: { ...job, fingerprint },
+          $set: { lastSeenAt: job.scrapedAt },
+          $addToSet: {
+            sources: {
+              name: job.source,
+              sourceJobId: job.sourceJobId ?? null,
+              url: job.url,
+              canonicalUrl: cUrl,
+            },
+          },
+        },
+        upsert: true,
+      },
     };
+  });
+
+  try {
+    const result = await Jobs.bulkWrite(ops, { ordered: false });
+    return {
+      inserted: result.insertedCount,
+      upserted: result.upsertedCount,
+    };
+  } catch (err: any) {
+    if (
+      err.code === 11000 ||
+      err.writeErrors?.every((e: any) => e.code === 11000)
+    ) {
+      await Jobs.bulkWrite(ops, { ordered: false });
+    } else throw err;
   }
 
-  const result = await Jobs.bulkWrite(operations);
+  console.log(totalJobs);
 
-  return {
-    inserted: result.insertedCount,
-    upserted: result.upsertedCount,
-  };
+  // const result = await Jobs.bulkWrite(operations);
 };
 
 const getAllJobs = async (query: Partial<Query>) => {
@@ -103,6 +129,16 @@ const updateJobs = async () => {
       },
     },
   );
+};
+
+const isSpecificUrl = (u: string | null): u is string => {
+  if (!u) return false;
+  try {
+    const { pathname, search } = new URL(u);
+    return pathname.length > 1 || search.length > 0;
+  } catch {
+    return false;
+  }
 };
 
 export { scrapAllJobs, getAllJobs, saveJobs, updateJobs };

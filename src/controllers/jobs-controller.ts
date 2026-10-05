@@ -9,49 +9,59 @@ import { scrappers } from "../scrappers";
 import { wwrScrapper } from "../scrappers/wwr";
 import { arbeitnowScrapper } from "../scrappers/arbeitnow";
 import { Query } from "../utils/job.interface";
+import { scrapRemotive } from "../scrappers/remotive";
 
 const getRemoteOkJobs = asyncWrapper(async (req: Request, res: Response) => {
-  const data = await remoteOkScrapper.scrap();
+  const total = await remoteOkScrapper.scrape();
 
-  if (!data) throw new Error("No data found");
+  if (!total) throw new Error("No data found");
 
-  const responseData = { total: data.length, data };
+  const responseData = { total };
   successResponse({ res, responseData });
 });
 
 const getHimalayasJobs = asyncWrapper(async (req: Request, res: Response) => {
-  const data = await himalayasScrapper.scrap();
+  const total = await himalayasScrapper.scrape();
 
-  if (!data) throw new Error("No data found");
+  if (!total) throw new Error("No data found");
 
-  const responseData = { total: data.length, data };
+  const responseData = { total };
   successResponse({ res, responseData });
 });
 
 const getWWRJobs = asyncWrapper(async (req: Request, res: Response) => {
-  const data = await wwrScrapper.scrap();
+  const total = await wwrScrapper.scrape();
 
-  if (!data) throw new Error("No data found");
+  if (!total) throw new Error("No data found");
 
-  const responseData = { total: data?.length, data };
+  const responseData = { total };
   successResponse({ res, responseData });
 });
 
 const getArbeitnowJobs = asyncWrapper(async (req: Request, res: Response) => {
-  const data = await arbeitnowScrapper.scrap();
+  const total = await arbeitnowScrapper.scrape();
 
-  if (!data) throw new Error("No data found");
+  if (!total) throw new Error("No data found");
 
-  const responseData = { total: data?.length, data };
+  const responseData = { total };
+  successResponse({ res, responseData });
+});
+
+const getRemotiveJobs = asyncWrapper(async (req: Request, res: Response) => {
+  const total = await scrapRemotive();
+
+  if (!total) throw new Error("No data found");
+
+  const responseData = { total };
   successResponse({ res, responseData });
 });
 
 const scrapeAll = asyncWrapper(async (req: Request, res: Response) => {
-  const jobs = await scrapAllJobs(scrappers);
+  const totalJobs = await scrapAllJobs(scrappers);
 
-  if (!jobs) throw new Error("An error occured")!;
+  if (!totalJobs) throw new Error("An error occured")!;
 
-  const responseData = { total: jobs.length, data: jobs };
+  const responseData = { total: totalJobs };
   successResponse({ res, responseData });
 });
 
@@ -69,6 +79,7 @@ export {
   getHimalayasJobs,
   getWWRJobs,
   getArbeitnowJobs,
+  getRemotiveJobs,
   scrapeAll,
   allJobs,
 };

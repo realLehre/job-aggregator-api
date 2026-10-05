@@ -1,27 +1,21 @@
 import Parser from "rss-parser";
 import { JobScrapper } from "../utils/types";
 import { IJob } from "../utils/job.interface";
-import { isAngularJob } from "../utils/angular-filter";
 import { saveJobs } from "../services/jobs-service";
 
 const parser = new Parser();
 
-const WWR_FEEDS = [
-  "https://weworkremotely.com/remote-jobs.rss",
-  "https://weworkremotely.com/categories/remote-programming-jobs.rss",
-  "https://weworkremotely.com/categories/remote-front-end-programming-jobs.rss",
-  "https://weworkremotely.com/categories/remote-full-stack-programming-jobs.rss",
-  "https://weworkremotely.com/categories/remote-back-end-programming-jobs.rss",
-  "https://weworkremotely.com/categories/remote-devops-sysadmin-jobs.rss",
-  "https://weworkremotely.com/categories/all-other-remote-jobs.rss",
+const REMOTIVE_FEEDS = [
+  "https://remotive.com/remote-jobs/feed/software-development",
 ];
 
-const scrapWWR = async (
+export const scrapRemotive = async (
   onBatch?: (jobs: IJob[]) => Promise<void>,
-): Promise<number> => {
+): Promise<any> => {
   let total = 0;
+  let testJobs: IJob[] = [];
 
-  for (const url of WWR_FEEDS) {
+  for (const url of REMOTIVE_FEEDS) {
     const response = await parser.parseURL(url);
     total += response.items.length;
 
@@ -34,7 +28,7 @@ const scrapWWR = async (
 
       remote: true,
 
-      employmentType: item.employmentType ?? [],
+      employmentType: [item.type ?? []],
 
       skills: item.categories ?? [],
 
@@ -44,13 +38,13 @@ const scrapWWR = async (
         currency: undefined,
       },
 
-      source: "WeWorkRemotely",
+      source: "Remotive",
 
       sourceJobId: String(item.guid),
 
       url: item.link ?? "",
 
-      postedAt: item.isoDate ? new Date(item.isoDate) : undefined,
+      postedAt: item.pubDate ? new Date(item.pubDate) : undefined,
 
       scrapedAt: new Date(),
     }));
@@ -61,13 +55,14 @@ const scrapWWR = async (
 
     await saveJobs(jobs);
 
+    testJobs.push(...jobs);
+
     total += jobs.length;
   }
-
-  return total;
+  return testJobs;
 };
 
-export const wwrScrapper: JobScrapper = {
-  name: "WWR",
-  scrape: scrapWWR,
+export const remotiveScrapper: JobScrapper = {
+  name: "Remotive",
+  scrape: scrapRemotive,
 };

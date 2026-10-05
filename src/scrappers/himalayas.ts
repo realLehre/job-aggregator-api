@@ -2,76 +2,68 @@ import { JobScrapper } from "../utils/types";
 import { IJob } from "../utils/job.interface";
 import { isAngularJob } from "../utils/angular-filter";
 import { saveJobs } from "../services/jobs-service";
+import { fetchJson, sleep } from "../utils/http-safety";
 
-const HIMALAYAS_URL = "https://himalayas.app/jobs/api/search?q=angular";
+const HIMALAYAS_URL = "https://himalayas.app/jobs/api";
 
-const scrapeHimalayas = async () => {
-  let hasNexPage: boolean = true;
+const scrapeHimalayas = async (onBatch?: (jobs: IJob[]) => Promise<void>) => {
   let page = 1;
   const jobs: IJob[] = [];
-  let cursor: string | null = null;
+  let total = 0;
 
-  while (true) {
-    const url: string = cursor
-      ? `${HIMALAYAS_URL}&cursor=${encodeURIComponent(cursor)}`
-      : HIMALAYAS_URL;
-    const url2 = `${HIMALAYAS_URL}&page=${page}`;
-    const response = await fetch(url2);
+  while (page <= 200) {
+    let data;
+    try {
+      data = await fetchJson(`${HIMALAYAS_URL}?page=${page}`);
+    } catch (err) {
+      console.error(`Himalayas: page ${page} failed after retries`, err);
+      break; // keep what we already saved
+    }
 
-    const pageResponse = await response.json();
+    const items: [] = data?.jobs ?? [];
+    if (items.length === 0) break;
 
-    const lastJob = pageResponse.jobs[pageResponse.jobs.length - 1];
-    const isTooOld = lastJob ? isOlderThanTwoMonths(lastJob) : true;
-
-    if (!pageResponse.jobs || pageResponse.jobs.length === 0 || page >= 20) {
+    if (!items || items.length === 0) {
       break;
     }
 
-    jobs.push(
-      ...pageResponse.jobs.map((item: any): any => ({
-        title: item.title,
-        company: item.companyName,
-        description: item.description ?? "",
-        location: item.locationRestrictions
-          ? item.locationRestrictions.join(", ")
-          : null,
-        remote: true,
-        employmentType: item.employmentType || [],
-        skills: item.categories ?? [],
-        salary: {
-          min: item.minSalary || undefined,
-          max: item.maxSalary || undefined,
-          currency: item.currency || undefined,
-        },
-        source: "Himalayas",
-        sourceJobId: String(item.guid),
-        url: item.applicationLink,
-        postedAt: item.pubDate ? new Date(item.pubDate * 1000) : null,
-        scrapedAt: new Date(),
-      })),
-    );
-
-    // cursor = pageResponse.nextCursor ?? null;
-    //
-    // if (!cursor) {
-    //   break;
-    // }
-
-    await saveJobs(jobs);
-
-    console.log({
-      page: {
-        index: page,
-        jobs: pageResponse.jobs.length,
-        totalCount: pageResponse.totalCount,
-        nextCursor: pageResponse.nextCursor,
+    const pageJobs: IJob[] = items.map((item: any): any => ({
+      title: item.title,
+      company: item.companyName,
+      description: item.description ?? "",
+      location: item.locationRestrictions
+        ? item.locationRestrictions.join(", ")
+        : null,
+      remote: true,
+      employmentType: item.employmentType || [],
+      skills: item.categories ?? [],
+      salary: {
+        min: item.minSalary || undefined,
+        max: item.maxSalary || undefined,
+        currency: item.currency || undefined,
       },
-    });
+      source: "Himalayas",
+      sourceJobId: String(item.guid),
+      url: item.applicationLink,
+      postedAt: item.pubDate ? new Date(item.pubDate * 1000) : null,
+      scrapedAt: new Date(),
+    }));
+
+    if (onBatch) {
+      await onBatch(pageJobs);
+    }
+
+    jobs.push(...pageJobs);
+
+    total += jobs.length;
+
+    await saveJobs(pageJobs);
 
     page++;
+    await sleep(500);
   }
 
-  return [];
+  return total;
 };
 
 const isOlderThanTwoMonths = (timeStamp: number): boolean => {
@@ -83,5 +75,5 @@ const isOlderThanTwoMonths = (timeStamp: number): boolean => {
 
 export const himalayasScrapper: JobScrapper = {
   name: "Himalayas",
-  scrap: scrapeHimalayas,
+  scrape: scrapeHimalayas,
 };

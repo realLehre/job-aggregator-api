@@ -4,6 +4,7 @@ import {
   getArbeitnowJobs,
   getHimalayasJobs,
   getRemoteOkJobs,
+  getRemotiveJobs,
   getWWRJobs,
   scrapeAll,
 } from "../controllers/jobs-controller";
@@ -16,6 +17,7 @@ jobsRoutes
   .get("/himalayas", getHimalayasJobs)
   .get("/wwr", getWWRJobs)
   .get("/arbeitnow", getArbeitnowJobs)
+  .get("/remotive", getRemotiveJobs)
   .post("/scrape/all", scrapeAll);
 
 export default jobsRoutes;
