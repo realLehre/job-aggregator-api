@@ -4,7 +4,11 @@ import asyncWrapper from "../utils/async-handler";
 import { remoteOkScrapper } from "../scrappers/remote-ok";
 import successResponse from "../utils/success-response";
 import { himalayasScrapper } from "../scrappers/himalayas";
-import { getAllJobs, saveJobs, scrapAllJobs } from "../services/jobs-service";
+import {
+  getAllJobs,
+  getSingleJob,
+  scrapAllJobs,
+} from "../services/jobs-service";
 import { scrappers } from "../scrappers";
 import { wwrScrapper } from "../scrappers/wwr";
 import { arbeitnowScrapper } from "../scrappers/arbeitnow";
@@ -66,11 +70,22 @@ const scrapeAll = asyncWrapper(async (req: Request, res: Response) => {
 });
 
 const allJobs = asyncWrapper(async (req: Request, res: Response) => {
+  console.log("query", req.query);
   const jobs = await getAllJobs(req.query);
 
   if (!jobs) throw new Error("Something went wrong");
 
   const responseData = { data: jobs };
+  successResponse({ res, responseData });
+});
+
+const getJob = asyncWrapper(async (req: Request, res: Response) => {
+  const { id } = req.params as { id: string };
+  const job = await getSingleJob(id);
+
+  if (!job) return res.status(404).json({ error: "Job not found" });
+
+  const responseData = { data: job };
   successResponse({ res, responseData });
 });
 
@@ -82,4 +97,5 @@ export {
   getRemotiveJobs,
   scrapeAll,
   allJobs,
+  getJob,
 };
