@@ -9,6 +9,7 @@ import {
   scrapeAll,
   getJob,
 } from "../controllers/jobs-controller";
+import { requireScraperSecret } from "../utils/scrape-protection";
 
 const jobsRoutes = express.Router();
 
@@ -20,6 +21,6 @@ jobsRoutes
   .get("/arbeitnow", getArbeitnowJobs)
   .get("/remotive", getRemotiveJobs)
   .get("/:id", getJob)
-  .post("/scrape/all", scrapeAll);
+  .post("/scrape/all", requireScraperSecret, scrapeAll);
 
 export default jobsRoutes;
