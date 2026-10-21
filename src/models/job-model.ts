@@ -41,6 +41,7 @@ const JobSchema = new mongoose.Schema(
 );
 
 JobSchema.index({ "sources.canonicalUrl": 1 });
+JobSchema.index({ postedAt: -1, _id: -1 });
 
 const Jobs = mongoose.model("Jobs", JobSchema);
 

@@ -1,6 +1,11 @@
 import cron from "node-cron";
 
-import { saveJobs, scrapAllJobs, updateJobs } from "../services/jobs-service";
+import {
+  saveJobs,
+  scrapAllJobs,
+  updateJobs,
+  deleteOldJobs,
+} from "../services/jobs-service";
 import { scrappers } from "../scrappers";
 
 const startJobScraper = () => {
@@ -23,4 +28,17 @@ const updateJobsInDb = () => {
   });
 };
 
-export { startJobScraper, updateJobsInDb };
+const deleteOldJobsCron = () => {
+  cron.schedule("0 */8 * * *", async () => {
+    try {
+      const count = await deleteOldJobs();
+      console.log(
+        `Scheduled delete old jobs completed: ${count} jobs deleted.`,
+      );
+    } catch (error) {
+      console.error("Scheduled delete old jobs failed:", error);
+    }
+  });
+};
+
+export { startJobScraper, updateJobsInDb, deleteOldJobsCron };

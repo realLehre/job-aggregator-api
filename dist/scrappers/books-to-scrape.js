@@ -41,12 +41,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
-const fs_1 = __importDefault(require("fs"));
-const path_1 = __importDefault(require("path"));
 const cheerio = __importStar(require("cheerio"));
 const url = "https://books.toscrape.com/";
 const scrap = () => __awaiter(void 0, void 0, void 0, function* () {
@@ -57,24 +52,13 @@ const scrap = () => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const html = yield response.text();
         const C = cheerio.load(html);
-        console.log(html);
         let books = [];
-        C("article.prod_pod").each((i, el) => {
+        C("article.product_pod").each((i, el) => {
             const title = C(el).find("h3 a").attr("title");
             const price = C(el).find(".price_color").text().trim();
-            console.log({ title, price });
             books.push({ title, price });
         });
-        const filePath = path_1.default.join(__dirname, "books-to-scrape.json");
-        const jsonString = JSON.stringify(books, null, 2);
-        fs_1.default.writeFile(filePath, jsonString, (err) => {
-            if (err) {
-                console.error("Error writing file", err);
-            }
-            else {
-                console.log("File written successfully");
-            }
-        });
+        return books;
     }
     catch (e) { }
 });

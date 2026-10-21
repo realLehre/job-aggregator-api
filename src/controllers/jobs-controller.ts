@@ -5,6 +5,7 @@ import { remoteOkScrapper } from "../scrappers/remote-ok";
 import successResponse from "../utils/success-response";
 import { himalayasScrapper } from "../scrappers/himalayas";
 import {
+  deleteOldJobs,
   getAllJobs,
   getSingleJob,
   scrapAllJobs,
@@ -89,6 +90,12 @@ const getJob = asyncWrapper(async (req: Request, res: Response) => {
   successResponse({ res, responseData });
 });
 
+const deleteOldJobsController = asyncWrapper(async (req: Request, res: Response) => {
+  const deletedCount = await deleteOldJobs();
+  const responseData = { deletedCount };
+  successResponse({ res, responseData, message: "Old jobs deleted successfully" });
+});
+
 export {
   getRemoteOkJobs,
   getHimalayasJobs,
@@ -98,4 +105,5 @@ export {
   scrapeAll,
   allJobs,
   getJob,
+  deleteOldJobsController,
 };

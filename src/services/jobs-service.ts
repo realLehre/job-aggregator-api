@@ -1,8 +1,8 @@
-import { JobScrapper } from '../utils/types';
-import { IJob, Query } from '../utils/job.interface';
-import Jobs from '../models/job-model';
-import { canonicalUrl, makeFingerprint } from '../utils/dedub';
-import { AnyBulkWriteOperation } from 'mongoose';
+import { JobScrapper } from "../utils/types";
+import { IJob, Query } from "../utils/job.interface";
+import Jobs from "../models/job-model";
+import { canonicalUrl, makeFingerprint } from "../utils/dedub";
+import mongoose, { AnyBulkWriteOperation } from "mongoose";
 
 const scrapAllJobs = async (scrapers: JobScrapper[]): Promise<any> => {
   const result = await Promise.allSettled(scrapers.map((s) => s.scrape()));
@@ -12,7 +12,7 @@ const scrapAllJobs = async (scrapers: JobScrapper[]): Promise<any> => {
   result.forEach((r, index) => {
     const scraper = scrapers[index];
 
-    if (r.status === 'fulfilled') {
+    if (r.status === "fulfilled") {
       jobs += r.value;
     } else {
       console.error(`Error occurred while scraping ${scraper.name}:`, r.reason);
@@ -36,7 +36,7 @@ const saveJobs = async (jobs: IJob[]) => {
     const useUrl = isSpecificUrl(cUrl);
 
     const filter = useUrl
-      ? { $or: [{ fingerprint }, { 'sources.canonicalUrl': cUrl }] }
+      ? { $or: [{ fingerprint }, { "sources.canonicalUrl": cUrl }] }
       : { fingerprint };
 
     return {
@@ -81,27 +81,30 @@ const saveJobs = async (jobs: IJob[]) => {
 };
 
 const getAllJobs = async (query: Partial<Query>) => {
-  const filter: Record<string, unknown> = {};
+  const baseFilter: Record<string, unknown> = {};
+  const searchConditions: any[] = [];
 
   if (query.search) {
-    filter.$or = [
-      { title: { $regex: query.search, $options: 'i' } },
-      { company: { $regex: query.search, $options: 'i' } },
-      { description: { $regex: query.search, $options: 'i' } },
-      { skills: { $regex: query.search, $options: 'i' } },
-    ];
+    searchConditions.push({
+      $or: [
+        { title: { $regex: query.search, $options: "i" } },
+        { company: { $regex: query.search, $options: "i" } },
+        { description: { $regex: query.search, $options: "i" } },
+        { skills: { $regex: query.search, $options: "i" } },
+      ],
+    });
   }
 
   if (query.remote !== undefined) {
-    filter.remote = query.remote;
+    baseFilter.remote = query.remote;
   }
 
   if (query.source) {
-    filter.source = { $regex: query.source, $options: 'i' };
+    baseFilter.source = { $regex: query.source, $options: "i" };
   }
 
   if (query.salary) {
-    filter.salary = { $regex: query.salary, $options: 'i' };
+    baseFilter.salary = { $regex: query.salary, $options: "i" };
   }
 
   const dateFilter: Record<any, any> = {};
@@ -117,33 +120,85 @@ const getAllJobs = async (query: Partial<Query>) => {
   }
 
   if (Object.keys(dateFilter).length > 0) {
-    filter.postedAt = dateFilter;
+    baseFilter.postedAt = dateFilter;
   }
 
-  const page = Math.max(query.page || 1, 1);
-  const limit = Math.min(query.limit || 20, 50);
-  const skip = (page - 1) * limit;
+  if (searchConditions.length > 0) {
+    baseFilter.$and = searchConditions;
+  }
+
+  const findFilter: Record<string, unknown> = { ...baseFilter };
+  const findConditions: any[] = [];
+
+  if (baseFilter.$and) {
+    findConditions.push(...(baseFilter.$and as any[]));
+  }
+
+  if (query.cursor) {
+    try {
+      const decoded = Buffer.from(query.cursor, "base64").toString("utf-8");
+      const cursorObj = JSON.parse(decoded);
+      if (cursorObj && cursorObj._id) {
+        const cursorDate = cursorObj.postedAt
+          ? new Date(cursorObj.postedAt)
+          : null;
+        const cursorId = new mongoose.Types.ObjectId(cursorObj._id);
+
+        if (cursorDate && !isNaN(cursorDate.getTime())) {
+          findConditions.push({
+            $or: [
+              { postedAt: { $lt: cursorDate } },
+              { postedAt: cursorDate, _id: { $lt: cursorId } },
+            ],
+          });
+        } else {
+          findConditions.push({ _id: { $lt: cursorId } });
+        }
+      }
+    } catch (err) {
+      console.error("Invalid cursor provided:", err);
+    }
+  }
+
+  if (findConditions.length > 0) {
+    findFilter.$and = findConditions;
+  } else {
+    delete findFilter.$and;
+  }
+
+  const limit = Math.min(query.limit ? Number(query.limit) : 20, 50);
+  const fetchLimit = limit + 1;
 
   const [jobs, totalJobs] = await Promise.all([
-    Jobs.find(filter)
+    Jobs.find(findFilter)
       .select(
-        'title company skills location remote postedAt source salary employmentType'
+        "title company skills location remote postedAt source salary employmentType",
       )
-      .sort({ postedAt: -1 })
-      .skip(skip)
-      .limit(limit)
+      .sort({ postedAt: -1, _id: -1 })
+      .limit(fetchLimit)
       .allowDiskUse(true),
 
-    Jobs.countDocuments(filter),
+    Jobs.countDocuments(baseFilter),
   ]);
+
+  let nextCursor: string | null = null;
+  if (jobs.length > limit) {
+    const nextItem = jobs.pop();
+    if (nextItem) {
+      const rawCursor = JSON.stringify({
+        postedAt: nextItem.postedAt ? nextItem.postedAt.toISOString() : null,
+        _id: nextItem._id.toString(),
+      });
+      nextCursor = Buffer.from(rawCursor).toString("base64");
+    }
+  }
 
   return {
     jobs,
     count: jobs.length,
     totalJobs,
-    page: +page,
-    limit: +limit,
-    totalPages: Math.ceil(totalJobs / limit),
+    nextCursor,
+    limit,
   };
 };
 
@@ -162,8 +217,20 @@ const updateJobs = async () => {
       $set: {
         active: false,
       },
-    }
+    },
   );
+};
+
+const deleteOldJobs = async () => {
+  const twoWeeksAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+  const result = await Jobs.deleteMany({
+    $or: [
+      { createdAt: { $lt: twoWeeksAgo } },
+      { postedAt: { $lt: twoWeeksAgo } },
+      { lastSeenAt: { $lt: twoWeeksAgo } },
+    ],
+  });
+  return result.deletedCount || 0;
 };
 
 const isSpecificUrl = (u: string | null): u is string => {
@@ -176,4 +243,11 @@ const isSpecificUrl = (u: string | null): u is string => {
   }
 };
 
-export { scrapAllJobs, getAllJobs, saveJobs, updateJobs, getSingleJob };
+export {
+  scrapAllJobs,
+  getAllJobs,
+  saveJobs,
+  updateJobs,
+  getSingleJob,
+  deleteOldJobs,
+};

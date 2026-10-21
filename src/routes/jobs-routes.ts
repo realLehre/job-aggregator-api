@@ -8,6 +8,7 @@ import {
   getWWRJobs,
   scrapeAll,
   getJob,
+  deleteOldJobsController,
 } from "../controllers/jobs-controller";
 import { requireScraperSecret } from "../utils/scrape-protection";
 
@@ -21,6 +22,7 @@ jobsRoutes
   .get("/arbeitnow", getArbeitnowJobs)
   .get("/remotive", getRemotiveJobs)
   .get("/:id", getJob)
-  .post("/scrape/all", requireScraperSecret, scrapeAll);
+  .post("/scrape/all", requireScraperSecret, scrapeAll)
+  .delete("/old/delete", requireScraperSecret, deleteOldJobsController);
 
 export default jobsRoutes;

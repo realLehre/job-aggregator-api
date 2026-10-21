@@ -1,7 +1,7 @@
 import app from "./server";
 
 import { dbConnect } from "./db/db-connect";
-import { startJobScraper, updateJobsInDb } from "./utils/cron";
+import { startJobScraper, updateJobsInDb, deleteOldJobsCron } from "./utils/cron";
 
 const port = process.env.PORT || "8080";
 
@@ -10,6 +10,7 @@ const startServer = async () => {
     await dbConnect(process.env.MONGODB_URI as string);
     await startJobScraper();
     await updateJobsInDb();
+    deleteOldJobsCron();
     app.listen(port, () => {
       console.log(`Server is running on port ${port} ok`);
     });

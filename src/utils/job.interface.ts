@@ -23,12 +23,13 @@ export interface IJob {
 export interface Query {
   search: string;
   remote: boolean;
-  page: number;
+  page?: number;
   limit: number;
   source: string;
   salary: string;
   startDate: Date;
   endDate: Date;
+  cursor?: string;
 }
 
 export interface JobMatchResult {
